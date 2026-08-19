@@ -1,0 +1,60 @@
+package com.placement.portal.controller;
+
+import com.placement.portal.entity.Student;
+import com.placement.portal.repository.StudentRepository;
+import jakarta.validation.Valid;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+@RequestMapping("/students")
+public class StudentController {
+    private final StudentRepository studentRepository;
+
+    public StudentController(StudentRepository studentRepository) {
+        this.studentRepository = studentRepository;
+    }
+
+    @GetMapping
+    public String list(@RequestParam(required = false) String keyword, Model model) {
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            model.addAttribute("students",
+                studentRepository.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+                    keyword.trim(), keyword.trim()));
+            model.addAttribute("keyword", keyword);
+        } else {
+            model.addAttribute("students", studentRepository.findAll());
+        }
+        return "students";
+    }
+
+    @GetMapping("/new")
+    public String newStudent(Model model) {
+        model.addAttribute("student", new Student());
+        return "student-form";
+    }
+
+    @PostMapping("/save")
+    public String save(@Valid @ModelAttribute("student") Student student,
+                       BindingResult result) {
+        if (result.hasErrors()) return "student-form";
+        studentRepository.save(student);
+        return "redirect:/students";
+    }
+
+    @GetMapping("/edit/{id}")
+    public String edit(@PathVariable Long id, Model model) {
+        Student student = studentRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Invalid student id: " + id));
+        model.addAttribute("student", student);
+        return "student-form";
+    }
+
+    @PostMapping("/delete/{id}")
+    public String delete(@PathVariable Long id) {
+        studentRepository.deleteById(id);
+        return "redirect:/students";
+    }
+}
