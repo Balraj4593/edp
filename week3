@@ -1,0 +1,380 @@
+package com.placement.portal.controller;
+
+import com.placement.portal.entity.Company;
+import com.placement.portal.repository.CompanyRepository;
+import jakarta.validation.Valid;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+@RequestMapping("/companies")
+public class CompanyController {
+
+    private final CompanyRepository companyRepository;
+
+    public CompanyController(CompanyRepository companyRepository) {
+        this.companyRepository = companyRepository;
+    }
+
+    @GetMapping
+    public String listCompanies(
+            @RequestParam(required = false) String keyword,
+            Model model) {
+
+        if (keyword != null && !keyword.trim().isEmpty()) {
+
+            model.addAttribute(
+                    "companies",
+                    companyRepository
+                            .findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+                                    keyword.trim(),
+                                    keyword.trim()
+                            )
+            );
+
+            model.addAttribute("keyword", keyword);
+
+        } else {
+            model.addAttribute("companies",
+                    companyRepository.findAll());
+        }
+
+        return "companies";
+    }
+
+    @GetMapping("/new")
+    public String showAddForm(Model model) {
+
+        model.addAttribute("company", new Company());
+
+        return "company-form";
+    }
+
+    @PostMapping("/save")
+    public String saveCompany(
+            @Valid @ModelAttribute("company") Company company,
+            BindingResult result) {
+
+        if (result.hasErrors()) {
+            return "company-form";
+        }
+
+        companyRepository.save(company);
+
+        return "redirect:/companies";
+    }
+
+    @GetMapping("/edit/{id}")
+    public String showEditForm(
+            @PathVariable Long id,
+            Model model) {
+
+        Company company = companyRepository.findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Invalid company id: " + id));
+
+        model.addAttribute("company", company);
+
+        return "company-form";
+    }
+
+    @PostMapping("/delete/{id}")
+    public String deleteCompany(@PathVariable Long id) {
+
+        companyRepository.deleteById(id);
+
+        return "redirect:/companies";
+    }
+}
+package com.placement.portal.repository;
+
+import com.placement.portal.entity.Company;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface CompanyRepository extends JpaRepository<Company, Long> {
+
+    List<Company> findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+            String name,
+            String email
+    );
+}
+package com.placement.portal.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
+
+@Entity
+@Table(name = "companies")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class Company {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @NotBlank(message = "Company name is required")
+    @Column(nullable = false, length = 150)
+    private String name;
+
+    @Email(message = "Enter a valid email")
+    private String email;
+
+    @NotBlank(message = "Location is required")
+    private String location;
+
+    private String website;
+}
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1">
+
+    <title>Companies - Placement Portal</title>
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet">
+
+    <link rel="stylesheet"
+          th:href="@{/css/style.css}">
+
+</head>
+
+<body>
+
+<nav class="navbar navbar-dark bg-primary">
+
+    <div class="container">
+
+        <a class="navbar-brand fw-bold"
+           th:href="@{/dashboard}">
+            Placement Management Portal
+        </a>
+
+        <form th:action="@{/logout}"
+              method="post">
+
+            <button class="btn btn-light btn-sm">
+                Logout
+            </button>
+
+        </form>
+
+    </div>
+
+</nav>
+
+
+<div class="container py-4">
+
+    <div class="d-flex
+                flex-wrap
+                justify-content-between
+                align-items-center
+                gap-2
+                mb-4">
+
+        <div>
+
+            <h2>Company Management</h2>
+
+            <p class="text-muted">
+                Manage companies participating in campus placements.
+            </p>
+
+        </div>
+
+        <a class="btn btn-primary"
+           th:href="@{/companies/new}">
+
+            + Add Company
+
+        </a>
+
+    </div>
+
+
+    <!-- Search -->
+
+    <form class="row g-2 mb-4"
+          method="get"
+          th:action="@{/companies}">
+
+        <div class="col-md-9">
+
+            <input
+                class="form-control"
+                name="keyword"
+                th:value="${keyword}"
+                placeholder="Search by company name or email">
+
+        </div>
+
+        <div class="col-md-3 d-grid">
+
+            <button class="btn btn-outline-primary">
+                Search
+            </button>
+
+        </div>
+
+    </form>
+
+
+    <!-- Company Table -->
+
+    <div class="card shadow-sm border-0">
+
+        <div class="table-responsive">
+
+            <table class="table
+                          table-hover
+                          align-middle
+                          mb-0">
+
+                <thead class="table-light">
+
+                <tr>
+
+                    <th>ID</th>
+
+                    <th>Company Name</th>
+
+                    <th>Email</th>
+
+                    <th>Location</th>
+
+                    <th>Website</th>
+
+                    <th>Actions</th>
+
+                </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                <tr th:if="${#lists.isEmpty(companies)}">
+
+                    <td colspan="6"
+                        class="text-center py-4 text-muted">
+
+                        No companies found.
+
+                    </td>
+
+                </tr>
+
+
+                <tr th:each="company : ${companies}">
+
+                    <td th:text="${company.id}">
+                        1
+                    </td>
+
+                    <td th:text="${company.name}">
+                        TCS
+                    </td>
+
+                    <td th:text="${company.email}">
+                        hr@tcs.com
+                    </td>
+
+                    <td th:text="${company.location}">
+                        Hyderabad
+                    </td>
+
+                    <td>
+
+                        <a
+                            th:if="${company.website != null
+                                   and !company.website.isEmpty()}"
+                            th:href="${company.website}"
+                            target="_blank"
+                            th:text="${company.website}">
+                        </a>
+
+                        <span
+                            th:unless="${company.website != null
+                                       and !company.website.isEmpty()}">
+
+                            -
+
+                        </span>
+
+                    </td>
+
+
+                    <td class="text-nowrap">
+
+                        <!-- Edit -->
+
+                        <a
+                            class="btn btn-sm btn-outline-primary"
+                            th:href="@{/companies/edit/{id}(id=${company.id})}">
+
+                            Edit
+
+                        </a>
+
+
+                        <!-- Delete -->
+
+                        <form
+                            th:action="@{/companies/delete/{id}(id=${company.id})}"
+                            method="post"
+                            class="d-inline"
+                            onsubmit="return confirm('Delete this company?');">
+
+                            <button
+                                class="btn btn-sm btn-outline-danger">
+
+                                Delete
+
+                            </button>
+
+                        </form>
+
+                    </td>
+
+                </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <a
+        class="btn btn-link mt-3 ps-0"
+        th:href="@{/dashboard}">
+
+        ← Back to Dashboard
+
+    </a>
+
+</div>
+
+</body>
+
+</html>
