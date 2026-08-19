@@ -1,0 +1,689 @@
+package com.placement.portal.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+
+@Entity
+@Table(name = "jobs")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class Job {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @NotBlank(message = "Job title is required")
+    @Column(nullable = false, length = 150)
+    private String title;
+
+    @NotBlank(message = "Job description is required")
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @NotBlank(message = "Location is required")
+    private String location;
+
+    @NotNull(message = "Package is required")
+    @DecimalMin(value = "0.0", message = "Package cannot be negative")
+    private BigDecimal packageLpa;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "company_id")
+    private Company company;
+}
+package com.placement.portal.repository;
+
+import com.placement.portal.entity.Job;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface JobRepository extends JpaRepository<Job, Long> {
+
+    List<Job> findByTitleContainingIgnoreCase(String title);
+}
+package com.placement.portal.controller;
+
+import com.placement.portal.entity.Job;
+import com.placement.portal.repository.CompanyRepository;
+import com.placement.portal.repository.JobRepository;
+
+import jakarta.validation.Valid;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+@RequestMapping("/jobs")
+public class JobController {
+
+    private final JobRepository jobRepository;
+    private final CompanyRepository companyRepository;
+
+    public JobController(JobRepository jobRepository,
+                         CompanyRepository companyRepository) {
+
+        this.jobRepository = jobRepository;
+        this.companyRepository = companyRepository;
+    }
+
+    // View all jobs / Search jobs
+    @GetMapping
+    public String listJobs(
+            @RequestParam(required = false) String keyword,
+            Model model) {
+
+        if (keyword != null && !keyword.trim().isEmpty()) {
+
+            model.addAttribute(
+                    "jobs",
+                    jobRepository.findByTitleContainingIgnoreCase(
+                            keyword.trim()
+                    )
+            );
+
+            model.addAttribute("keyword", keyword);
+
+        } else {
+
+            model.addAttribute(
+                    "jobs",
+                    jobRepository.findAll()
+            );
+        }
+
+        return "jobs";
+    }
+
+    // Show Add Job form
+    @GetMapping("/new")
+    public String showAddForm(Model model) {
+
+        model.addAttribute("job", new Job());
+
+        model.addAttribute(
+                "companies",
+                companyRepository.findAll()
+        );
+
+        return "job-form";
+    }
+
+    // Save Job
+    @PostMapping("/save")
+    public String saveJob(
+            @Valid @ModelAttribute("job") Job job,
+            BindingResult result,
+            Model model) {
+
+        if (result.hasErrors()) {
+
+            model.addAttribute(
+                    "companies",
+                    companyRepository.findAll()
+            );
+
+            return "job-form";
+        }
+
+        jobRepository.save(job);
+
+        return "redirect:/jobs";
+    }
+
+    // Edit Job
+    @GetMapping("/edit/{id}")
+    public String showEditForm(
+            @PathVariable Long id,
+            Model model) {
+
+        Job job = jobRepository.findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Invalid job id: " + id
+                        ));
+
+        model.addAttribute("job", job);
+
+        model.addAttribute(
+                "companies",
+                companyRepository.findAll()
+        );
+
+        return "job-form";
+    }
+
+    // Delete Job
+    @PostMapping("/delete/{id}")
+    public String deleteJob(@PathVariable Long id) {
+
+        jobRepository.deleteById(id);
+
+        return "redirect:/jobs";
+    }
+}
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1">
+
+    <title>Jobs - Placement Portal</title>
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet">
+
+    <link
+        rel="stylesheet"
+        th:href="@{/css/style.css}">
+
+</head>
+
+<body>
+
+<nav class="navbar navbar-dark bg-primary">
+
+    <div class="container">
+
+        <a class="navbar-brand fw-bold"
+           th:href="@{/dashboard}">
+
+            Placement Management Portal
+
+        </a>
+
+        <form th:action="@{/logout}"
+              method="post">
+
+            <button class="btn btn-light btn-sm">
+                Logout
+            </button>
+
+        </form>
+
+    </div>
+
+</nav>
+
+
+<div class="container py-4">
+
+    <div class="d-flex
+                flex-wrap
+                justify-content-between
+                align-items-center
+                mb-4">
+
+        <div>
+
+            <h2>Job Management</h2>
+
+            <p class="text-muted">
+
+                Manage placement jobs and drives.
+
+            </p>
+
+        </div>
+
+        <a class="btn btn-primary"
+           th:href="@{/jobs/new}">
+
+            + Add Job
+
+        </a>
+
+    </div>
+
+
+    <!-- Search -->
+
+    <form class="row g-2 mb-4"
+          method="get"
+          th:action="@{/jobs}">
+
+        <div class="col-md-9">
+
+            <input
+                class="form-control"
+                name="keyword"
+                th:value="${keyword}"
+                placeholder="Search job title">
+
+        </div>
+
+        <div class="col-md-3 d-grid">
+
+            <button class="btn btn-outline-primary">
+
+                Search
+
+            </button>
+
+        </div>
+
+    </form>
+
+
+    <!-- Jobs Table -->
+
+    <div class="card shadow-sm border-0">
+
+        <div class="table-responsive">
+
+            <table class="table
+                          table-hover
+                          align-middle
+                          mb-0">
+
+                <thead class="table-light">
+
+                <tr>
+
+                    <th>ID</th>
+
+                    <th>Job Title</th>
+
+                    <th>Company</th>
+
+                    <th>Location</th>
+
+                    <th>Package</th>
+
+                    <th>Description</th>
+
+                    <th>Actions</th>
+
+                </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                <tr th:if="${#lists.isEmpty(jobs)}">
+
+                    <td colspan="7"
+                        class="text-center py-4 text-muted">
+
+                        No jobs found.
+
+                    </td>
+
+                </tr>
+
+
+                <tr th:each="job : ${jobs}">
+
+                    <td th:text="${job.id}">
+                        1
+                    </td>
+
+                    <td th:text="${job.title}">
+                        Java Developer
+                    </td>
+
+                    <td
+                        th:text="${job.company != null ?
+                        job.company.name : 'Not Assigned'}">
+
+                        TCS
+
+                    </td>
+
+                    <td th:text="${job.location}">
+                        Hyderabad
+                    </td>
+
+                    <td>
+
+                        ₹
+                        <span
+                            th:text="${job.packageLpa}">
+                            6.5
+                        </span>
+                        LPA
+
+                    </td>
+
+                    <td>
+
+                        <span
+                            th:text="${job.description}">
+                        </span>
+
+                    </td>
+
+
+                    <td class="text-nowrap">
+
+                        <a
+                            class="btn btn-sm btn-outline-primary"
+                            th:href="@{/jobs/edit/{id}(id=${job.id})}">
+
+                            Edit
+
+                        </a>
+
+
+                        <form
+                            th:action="@{/jobs/delete/{id}(id=${job.id})}"
+                            method="post"
+                            class="d-inline"
+                            onsubmit="return confirm('Delete this job?');">
+
+                            <button
+                                class="btn btn-sm btn-outline-danger">
+
+                                Delete
+
+                            </button>
+
+                        </form>
+
+                    </td>
+
+                </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <a
+        class="btn btn-link mt-3 ps-0"
+        th:href="@{/dashboard}">
+
+        ← Back to Dashboard
+
+    </a>
+
+</div>
+
+</body>
+
+</html>
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1">
+
+    <title>Job Form - Placement Portal</title>
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet">
+
+    <link
+        rel="stylesheet"
+        th:href="@{/css/style.css}">
+
+</head>
+
+
+<body>
+
+<nav class="navbar navbar-dark bg-primary">
+
+    <div class="container">
+
+        <a class="navbar-brand fw-bold"
+           th:href="@{/dashboard}">
+
+            Placement Management Portal
+
+        </a>
+
+    </div>
+
+</nav>
+
+
+<div class="container py-5">
+
+    <div class="row justify-content-center">
+
+        <div class="col-lg-8">
+
+            <div class="card shadow-sm border-0">
+
+                <div class="card-body p-4">
+
+                    <h2 class="mb-4"
+                        th:text="${job.id == null ?
+                        'Add Job' :
+                        'Edit Job'}">
+
+                        Job Form
+
+                    </h2>
+
+
+                    <form
+                        th:action="@{/jobs/save}"
+                        th:object="${job}"
+                        method="post">
+
+
+                        <input
+                            type="hidden"
+                            th:field="*{id}">
+
+
+                        <div class="row g-3">
+
+
+                            <!-- Job Title -->
+
+                            <div class="col-md-6">
+
+                                <label class="form-label">
+
+                                    Job Title *
+
+                                </label>
+
+                                <input
+                                    class="form-control"
+                                    th:field="*{title}"
+                                    placeholder="Java Developer">
+
+                                <div
+                                    class="text-danger small"
+                                    th:errors="*{title}">
+                                </div>
+
+                            </div>
+
+
+                            <!-- Company -->
+
+                            <div class="col-md-6">
+
+                                <label class="form-label">
+
+                                    Company *
+
+                                </label>
+
+                                <select
+                                    class="form-select"
+                                    th:field="*{company}">
+
+                                    <option value="">
+                                        Select Company
+                                    </option>
+
+                                    <option
+                                        th:each="company : ${companies}"
+                                        th:value="${company.id}"
+                                        th:text="${company.name}">
+
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+
+                            <!-- Location -->
+
+                            <div class="col-md-6">
+
+                                <label class="form-label">
+
+                                    Location *
+
+                                </label>
+
+                                <input
+                                    class="form-control"
+                                    th:field="*{location}"
+                                    placeholder="Hyderabad">
+
+                                <div
+                                    class="text-danger small"
+                                    th:errors="*{location}">
+                                </div>
+
+                            </div>
+
+
+                            <!-- Package -->
+
+                            <div class="col-md-6">
+
+                                <label class="form-label">
+
+                                    Package (LPA) *
+
+                                </label>
+
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    class="form-control"
+                                    th:field="*{packageLpa}"
+                                    placeholder="6.50">
+
+                                <div
+                                    class="text-danger small"
+                                    th:errors="*{packageLpa}">
+                                </div>
+
+                            </div>
+
+
+                            <!-- Description -->
+
+                            <div class="col-12">
+
+                                <label class="form-label">
+
+                                    Job Description *
+
+                                </label>
+
+                                <textarea
+                                    class="form-control"
+                                    rows="5"
+                                    th:field="*{description}"
+                                    placeholder="Enter job requirements and responsibilities">
+                                </textarea>
+
+                                <div
+                                    class="text-danger small"
+                                    th:errors="*{description}">
+                                </div>
+
+                            </div>
+
+
+                        </div>
+
+
+                        <div class="mt-4">
+
+                            <button
+                                class="btn btn-primary"
+                                type="submit">
+
+                                Save Job
+
+                            </button>
+
+
+                            <a
+                                class="btn btn-secondary"
+                                th:href="@{/jobs}">
+
+                                Cancel
+
+                            </a>
+
+                        </div>
+
+
+                    </form>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+
+</html>
+<a class="btn btn-outline-primary"
+   th:href="@{/jobs}">
+    Jobs
+</a>
+<div class="card shadow-sm border-0 mt-4">
+
+    <div class="card-body">
+
+        <h5>Job Management</h5>
+
+        <p class="text-muted">
+            Manage placement jobs and connect them with companies.
+        </p>
+
+        <a class="btn btn-outline-primary"
+           th:href="@{/jobs}">
+
+            Open Jobs
+
+        </a>
+
+    </div>
+
+</div>
