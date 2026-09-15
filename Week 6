@@ -1,0 +1,225 @@
+const mongoose = require("mongoose");
+
+const applicationSchema = new mongoose.Schema(
+  {
+    studentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Student",
+      required: true
+    },
+
+    placementId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Placement",
+      required: true
+    },
+
+    appliedDate: {
+      type: Date,
+      default: Date.now
+    },
+
+    status: {
+      type: String,
+      enum: [
+        "Applied",
+        "Shortlisted",
+        "Rejected",
+        "Selected"
+      ],
+      default: "Applied"
+    }
+  },
+  {
+    timestamps: true
+  }
+);
+
+// Prevent the same student from applying twice
+applicationSchema.index(
+  {
+    studentId: 1,
+    placementId: 1
+  },
+  {
+    unique: true
+  }
+);
+
+module.exports = mongoose.model(
+  "Application",
+  applicationSchema
+);
+const express = require("express");
+const router = express.Router();
+
+const Application = require("../models/Application");
+
+// Apply for a placement
+router.post("/", async (req, res) => {
+  try {
+    const {
+      studentId,
+      placementId
+    } = req.body;
+
+    if (!studentId || !placementId) {
+      return res.status(400).json({
+        message: "Student ID and Placement ID are required"
+      });
+    }
+
+    // Check duplicate application
+    const existingApplication =
+      await Application.findOne({
+        studentId,
+        placementId
+      });
+
+    if (existingApplication) {
+      return res.status(409).json({
+        message: "Student has already applied for this placement"
+      });
+    }
+
+    const application = await Application.create({
+      studentId,
+      placementId
+    });
+
+    res.status(201).json({
+      message: "Application submitted successfully",
+      application
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to submit application",
+      error: error.message
+    });
+  }
+});
+
+// Get all applications
+router.get("/", async (req, res) => {
+  try {
+    const applications = await Application.find()
+      .populate("studentId")
+      .populate("placementId")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(applications);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch applications",
+      error: error.message
+    });
+  }
+});
+
+// Get applications of a particular student
+router.get("/student/:studentId", async (req, res) => {
+  try {
+    const applications =
+      await Application.find({
+        studentId: req.params.studentId
+      })
+        .populate("placementId")
+        .sort({ createdAt: -1 });
+
+    res.status(200).json(applications);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch student applications",
+      error: error.message
+    });
+  }
+});
+
+// Update application status
+router.put("/:id/status", async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    const validStatuses = [
+      "Applied",
+      "Shortlisted",
+      "Rejected",
+      "Selected"
+    ];
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        message: "Invalid application status"
+      });
+    }
+
+    const application =
+      await Application.findByIdAndUpdate(
+        req.params.id,
+        { status },
+        {
+          new: true,
+          runValidators: true
+        }
+      );
+
+    if (!application) {
+      return res.status(404).json({
+        message: "Application not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "Application status updated successfully",
+      application
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to update application status",
+      error: error.message
+    });
+  }
+});
+
+// Delete application
+router.delete("/:id", async (req, res) => {
+  try {
+    const application =
+      await Application.findByIdAndDelete(
+        req.params.id
+      );
+
+    if (!application) {
+      return res.status(404).json({
+        message: "Application not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "Application deleted successfully"
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to delete application",
+      error: error.message
+    });
+  }
+});
+
+module.exports = router;
+const applicationRoutes =
+  require("./routes/applicationRoutes");
+
+app.use(
+  "/api/applications",
+  applicationRoutes
+);
+app.use("/api/placements", placementRoutes);
+app.use("/api/applications", applicationRoutes);
+{
+  "studentId": "68c123456789abcdef123456",
+  "placementId": "68c987654321abcdef654321"
+}
+{
+  "status": "Shortlisted"
+}
