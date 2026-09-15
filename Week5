@@ -1,0 +1,202 @@
+const mongoose = require("mongoose");
+
+const placementSchema = new mongoose.Schema(
+  {
+    companyName: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    jobRole: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    eligibility: {
+      type: String,
+      required: true
+    },
+
+    package: {
+      type: String,
+      required: true
+    },
+
+    location: {
+      type: String,
+      required: true
+    },
+
+    applicationDeadline: {
+      type: Date,
+      required: true
+    },
+
+    description: {
+      type: String
+    },
+
+    status: {
+      type: String,
+      enum: ["Open", "Closed"],
+      default: "Open"
+    }
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model("Placement", placementSchema);
+const express = require("express");
+const router = express.Router();
+
+const Placement = require("../models/Placement");
+
+// CREATE placement drive
+router.post("/", async (req, res) => {
+  try {
+    const {
+      companyName,
+      jobRole,
+      eligibility,
+      package,
+      location,
+      applicationDeadline,
+      description
+    } = req.body;
+
+    if (
+      !companyName ||
+      !jobRole ||
+      !eligibility ||
+      !package ||
+      !location ||
+      !applicationDeadline
+    ) {
+      return res.status(400).json({
+        message: "All required fields must be provided"
+      });
+    }
+
+    const placement = await Placement.create({
+      companyName,
+      jobRole,
+      eligibility,
+      package,
+      location,
+      applicationDeadline,
+      description
+    });
+
+    res.status(201).json({
+      message: "Placement drive created successfully",
+      placement
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to create placement drive",
+      error: error.message
+    });
+  }
+});
+
+// GET all placement drives
+router.get("/", async (req, res) => {
+  try {
+    const placements = await Placement.find().sort({
+      createdAt: -1
+    });
+
+    res.status(200).json(placements);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch placement drives",
+      error: error.message
+    });
+  }
+});
+
+// GET placement drive by ID
+router.get("/:id", async (req, res) => {
+  try {
+    const placement = await Placement.findById(req.params.id);
+
+    if (!placement) {
+      return res.status(404).json({
+        message: "Placement drive not found"
+      });
+    }
+
+    res.status(200).json(placement);
+  } catch (error) {
+    res.status(500).json({
+      message: "Invalid placement ID"
+    });
+  }
+});
+
+// UPDATE placement drive
+router.put("/:id", async (req, res) => {
+  try {
+    const placement = await Placement.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      {
+        new: true,
+        runValidators: true
+      }
+    );
+
+    if (!placement) {
+      return res.status(404).json({
+        message: "Placement drive not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "Placement drive updated successfully",
+      placement
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to update placement drive",
+      error: error.message
+    });
+  }
+});
+
+// DELETE placement drive
+router.delete("/:id", async (req, res) => {
+  try {
+    const placement = await Placement.findByIdAndDelete(
+      req.params.id
+    );
+
+    if (!placement) {
+      return res.status(404).json({
+        message: "Placement drive not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "Placement drive deleted successfully"
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to delete placement drive",
+      error: error.message
+    });
+  }
+});
+
+module.exports = router;
+{
+  "companyName": "TCS",
+  "jobRole": "Software Developer",
+  "eligibility": "B.Tech with minimum 60%",
+  "package": "6 LPA",
+  "location": "Hyderabad",
+  "applicationDeadline": "2026-10-15",
+  "description": "Recruitment drive for software development roles."
+}
