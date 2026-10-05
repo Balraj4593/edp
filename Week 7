@@ -1,0 +1,179 @@
+const express = require("express");
+const router = express.Router();
+
+const Student = require("../models/Student");
+const Placement = require("../models/Placement");
+const Application = require("../models/Application");
+
+// Get dashboard statistics
+router.get("/dashboard", async (req, res) => {
+  try {
+    const totalStudents = await Student.countDocuments();
+
+    const totalPlacements = await Placement.countDocuments();
+
+    const activePlacements = await Placement.countDocuments({
+      status: "Open"
+    });
+
+    const totalApplications =
+      await Application.countDocuments();
+
+    const selectedStudents =
+      await Application.countDocuments({
+        status: "Selected"
+      });
+
+    const shortlistedStudents =
+      await Application.countDocuments({
+        status: "Shortlisted"
+      });
+
+    res.status(200).json({
+      totalStudents,
+      totalPlacements,
+      activePlacements,
+      totalApplications,
+      selectedStudents,
+      shortlistedStudents
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to load dashboard",
+      error: error.message
+    });
+  }
+});
+
+
+// Get all students
+router.get("/students", async (req, res) => {
+  try {
+    const students = await Student.find()
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(students);
+
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch students",
+      error: error.message
+    });
+  }
+});
+
+
+// Get all placement drives
+router.get("/placements", async (req, res) => {
+  try {
+    const placements = await Placement.find()
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(placements);
+
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch placements",
+      error: error.message
+    });
+  }
+});
+
+
+// Get all applications for admin
+router.get("/applications", async (req, res) => {
+  try {
+    const applications =
+      await Application.find()
+        .populate("studentId")
+        .populate("placementId")
+        .sort({ createdAt: -1 });
+
+    res.status(200).json(applications);
+
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch applications",
+      error: error.message
+    });
+  }
+});
+
+
+// Update application status
+router.put("/applications/:id", async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    const allowedStatuses = [
+      "Applied",
+      "Shortlisted",
+      "Rejected",
+      "Selected"
+    ];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        message: "Invalid application status"
+      });
+    }
+
+    const application =
+      await Application.findByIdAndUpdate(
+        req.params.id,
+        { status },
+        {
+          new: true,
+          runValidators: true
+        }
+      );
+
+    if (!application) {
+      return res.status(404).json({
+        message: "Application not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "Application status updated successfully",
+      application
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to update application",
+      error: error.message
+    });
+  }
+});
+
+
+module.exports = router;
+const adminRoutes =
+  require("./routes/adminRoutes");
+app.use("/api/admin", adminRoutes);
+app.use("/api/placements", placementRoutes);
+
+app.use(
+  "/api/applications",
+  applicationRoutes
+);
+
+app.use(
+  "/api/admin",
+  adminRoutes
+);
+{
+  "totalStudents": 120,
+  "totalPlacements": 15,
+  "activePlacements": 8,
+  "totalApplications": 350,
+  "selectedStudents": 25,
+  "shortlistedStudents": 60
+}
+.populate("studentId")
+.populate("placementId")
+{
+  "status": "Selected"
+}
