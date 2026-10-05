@@ -1,0 +1,359 @@
+const express = require("express");
+const router = express.Router();
+
+const User = require("../models/User");
+const Placement = require("../models/Placement");
+const Application = require("../models/Application");
+
+const {
+  authenticate,
+  authorize
+} = require("../middleware/authMiddleware");
+router.get(
+  "/dashboard",
+  authenticate,
+  authorize("student"),
+  async (req, res) => {
+    try {
+
+      const studentId = req.user.userId;
+
+      const totalApplications =
+        await Application.countDocuments({
+          studentId
+        });
+
+      const shortlisted =
+        await Application.countDocuments({
+          studentId,
+          status: "Shortlisted"
+        });
+
+      const selected =
+        await Application.countDocuments({
+          studentId,
+          status: "Selected"
+        });
+
+      const rejected =
+        await Application.countDocuments({
+          studentId,
+          status: "Rejected"
+        });
+
+      const availablePlacements =
+        await Placement.countDocuments({
+          status: "Open"
+        });
+
+      res.status(200).json({
+        totalApplications,
+        shortlisted,
+        selected,
+        rejected,
+        availablePlacements
+      });
+
+    } catch (error) {
+
+      res.status(500).json({
+        message: "Failed to load student dashboard",
+        error: error.message
+      });
+
+    }
+  }
+);
+
+
+// ===============================
+// GET STUDENT PROFILE
+// ===============================
+
+router.get(
+  "/profile",
+  authenticate,
+  authorize("student"),
+  async (req, res) => {
+
+    try {
+
+      const student =
+        await User.findById(req.user.userId)
+          .select("-password");
+
+      if (!student) {
+        return res.status(404).json({
+          message: "Student profile not found"
+        });
+      }
+
+      res.status(200).json(student);
+
+    } catch (error) {
+
+      res.status(500).json({
+        message: "Failed to fetch profile",
+        error: error.message
+      });
+
+    }
+  }
+);
+
+
+// ===============================
+// UPDATE STUDENT PROFILE
+// ===============================
+
+router.put(
+  "/profile",
+  authenticate,
+  authorize("student"),
+  async (req, res) => {
+
+    try {
+
+      const {
+        name,
+        phone,
+        branch,
+        cgpa,
+        graduationYear
+      } = req.body;
+
+      const student =
+        await User.findByIdAndUpdate(
+          req.user.userId,
+          {
+            name,
+            phone,
+            branch,
+            cgpa,
+            graduationYear
+          },
+          {
+            new: true,
+            runValidators: true
+          }
+        ).select("-password");
+
+      if (!student) {
+        return res.status(404).json({
+          message: "Student not found"
+        });
+      }
+
+      res.status(200).json({
+        message: "Profile updated successfully",
+        student
+      });
+
+    } catch (error) {
+
+      res.status(500).json({
+        message: "Failed to update profile",
+        error: error.message
+      });
+
+    }
+  }
+);
+
+
+// ===============================
+// SEARCH PLACEMENTS
+// ===============================
+
+router.get(
+  "/placements",
+  authenticate,
+  authorize("student"),
+  async (req, res) => {
+
+    try {
+
+      const {
+        search,
+        location
+      } = req.query;
+
+      let filter = {
+        status: "Open"
+      };
+
+      if (search) {
+
+        filter.$or = [
+          {
+            companyName: {
+              $regex: search,
+              $options: "i"
+            }
+          },
+          {
+            jobRole: {
+              $regex: search,
+              $options: "i"
+            }
+          }
+        ];
+
+      }
+
+      if (location) {
+
+        filter.location = {
+          $regex: location,
+          $options: "i"
+        };
+
+      }
+
+      const placements =
+        await Placement.find(filter)
+          .sort({
+            createdAt: -1
+          });
+
+      res.status(200).json(placements);
+
+    } catch (error) {
+
+      res.status(500).json({
+        message: "Failed to fetch placements",
+        error: error.message
+      });
+
+    }
+  }
+);
+
+
+// ===============================
+// STUDENT APPLICATIONS
+// ===============================
+
+router.get(
+  "/applications",
+  authenticate,
+  authorize("student"),
+  async (req, res) => {
+
+    try {
+
+      const applications =
+        await Application.find({
+          studentId: req.user.userId
+        })
+        .populate("placementId")
+        .sort({
+          createdAt: -1
+        });
+
+      res.status(200).json(applications);
+
+    } catch (error) {
+
+      res.status(500).json({
+        message: "Failed to fetch applications",
+        error: error.message
+      });
+
+    }
+  }
+);
+
+
+module.exports = router;
+phone: {
+  type: String
+},
+
+branch: {
+  type: String
+},
+
+cgpa: {
+  type: Number
+},
+
+graduationYear: {
+  type: Number
+}
+const userSchema = new mongoose.Schema({
+
+  name: {
+    type: String,
+    required: true
+  },
+
+  email: {
+    type: String,
+    required: true,
+    unique: true
+  },
+
+  password: {
+    type: String,
+    required: true
+  },
+
+  phone: String,
+
+  branch: String,
+
+  cgpa: Number,
+
+  graduationYear: Number,
+
+  role: {
+    type: String,
+    enum: ["student", "admin"],
+    default: "student"
+  }
+
+}, {
+  timestamps: true
+});
+{
+  "totalApplications": 8,
+  "shortlisted": 3,
+  "selected": 1,
+  "rejected": 2,
+  "availablePlacements": 12
+}
+{
+  "name": "Rahul Kumar",
+  "phone": "9876543210",
+  "branch": "Computer Science",
+  "cgpa": 8.2,
+  "graduationYear": 2027
+}
+{
+  "message": "Profile updated successfully",
+  "student": {
+    "name": "Rahul Kumar",
+    "branch": "Computer Science",
+    "cgpa": 8.2,
+    "graduationYear": 2027
+  }
+}
+[
+  {
+    "status": "Shortlisted",
+    "placementId": {
+      "companyName": "TCS",
+      "jobRole": "Software Developer",
+      "package": "6 LPA"
+    }
+  },
+  {
+    "status": "Applied",
+    "placementId": {
+      "companyName": "Infosys",
+      "jobRole": "System Engineer",
+      "package": "5 LPA"
+    }
+  }
+]
