@@ -1,0 +1,143 @@
+
+spring.application.name=placement-management-portal
+
+spring.datasource.url=jdbc:mysql://localhost:3306/placement_portal
+spring.datasource.username=root
+spring.datasource.password=YOUR_MYSQL_PASSWORD
+
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+server.port=8080
+
+CREATE DATABASE IF NOT EXISTS placement_portal;
+
+USE placement_portal;
+
+CREATE TABLE IF NOT EXISTS students (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    phone VARCHAR(20),
+    department VARCHAR(100),
+    graduation_year INT,
+    cgpa DECIMAL(4,2)
+);
+
+CREATE TABLE IF NOT EXISTS companies (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    email VARCHAR(150),
+    location VARCHAR(150),
+    website VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS jobs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(150) NOT NULL,
+    description TEXT,
+    location VARCHAR(150),
+    package_lpa DECIMAL(8,2),
+    company_id BIGINT,
+    CONSTRAINT fk_job_company
+        FOREIGN KEY (company_id)
+        REFERENCES companies(id)
+        ON DELETE SET NULL
+);
+
+package com.placement.portal;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class PlacementPortalApplicationTests {
+
+    @Test
+    void testFrameworkIsAvailable() {
+        assertTrue(true);
+    }
+}
+
+package com.placement.portal;
+
+import com.placement.portal.entity.Student;
+import com.placement.portal.repository.StudentRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+
+import java.math.BigDecimal;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DataJpaTest
+class StudentRepositoryTests {
+
+    @Autowired
+    private StudentRepository studentRepository;
+
+    @Test
+    void savesAndFindsStudent() {
+        Student student = new Student();
+        student.setName("Demo Student");
+        student.setEmail("demo.student@example.com");
+        student.setPhone("9876543210");
+        student.setDepartment("CSE");
+        student.setGraduationYear(2028);
+        student.setCgpa(new BigDecimal("7.90"));
+
+        Student saved = studentRepository.save(student);
+
+        assertThat(saved.getId()).isNotNull();
+        assertThat(studentRepository.findById(saved.getId()))
+                .isPresent();
+    }
+}
+
+package com.placement.portal;
+
+import com.placement.portal.entity.Company;
+import com.placement.portal.entity.Job;
+import com.placement.portal.repository.CompanyRepository;
+import com.placement.portal.repository.JobRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+
+import java.math.BigDecimal;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DataJpaTest
+class JobRepositoryTests {
+
+    @Autowired
+    private CompanyRepository companyRepository;
+
+    @Autowired
+    private JobRepository jobRepository;
+
+    @Test
+    void savesJobLinkedToCompany() {
+        Company company = new Company();
+        company.setName("Test Company");
+        company.setLocation("Hyderabad");
+        company = companyRepository.save(company);
+
+        Job job = new Job();
+        job.setTitle("Java Developer");
+        job.setDescription("Entry-level Java role");
+        job.setLocation("Hyderabad");
+        job.setPackageLpa(new BigDecimal("6.50"));
+        job.setCompany(company);
+
+        Job saved = jobRepository.save(job);
+
+        assertThat(saved.getId()).isNotNull();
+        assertThat(saved.getCompany().getId())
+                .isEqualTo(company.getId());
+        assertThat(jobRepository.findById(saved.getId()))
+                .isPresent();
+    }
+}
